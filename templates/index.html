@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GMSH Command Helper</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      color: #1a1a1a;
+    }
+
+    header {
+      background: #1a56db;
+      color: white;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    header h1 { font-size: 1.15rem; font-weight: 600; }
+    header span { font-size: 0.8rem; opacity: 0.75; }
+
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      display: flex;
+      gap: 12px;
+      max-width: 820px;
+    }
+    .message.user  { align-self: flex-end; flex-direction: row-reverse; }
+    .message.bot   { align-self: flex-start; }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      color: white;
+    }
+    .message.user .avatar  { background: #1a56db; }
+    .message.bot  .avatar  { background: #16a34a; }
+
+    .bubble {
+      padding: 12px 16px;
+      border-radius: 16px;
+      line-height: 1.6;
+      font-size: 0.92rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-width: 720px;
+    }
+    .message.user .bubble {
+      background: #1a56db;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .message.bot .bubble {
+      background: white;
+      color: #1a1a1a;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* Inline code */
+    .bubble code {
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.85em;
+    }
+    .message.user .bubble code {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+
+    /* Code blocks */
+    .bubble pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px 14px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 8px 0;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.82em;
+      line-height: 1.5;
+    }
+    .bubble pre code { background: none; color: inherit; padding: 0; }
+
+
+    .typing-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      background: #94a3b8;
+      border-radius: 50%;
+      margin: 0 2px;
+      animation: blink 1.2s infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink {
+      0%, 80%, 100% { opacity: 0.2; }
+      40% { opacity: 1; }
+    }
+
+    #input-bar {
+      background: white;
+      border-top: 1px solid #e2e8f0;
+      padding: 14px 24px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    #question {
+      flex: 1;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.93rem;
+      resize: none;
+      outline: none;
+      max-height: 140px;
+      line-height: 1.5;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    #question:focus { border-color: #1a56db; }
+
+    #send-btn {
+      background: #1a56db;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    #send-btn:hover:not(:disabled) { background: #1648c0; }
+    #send-btn:disabled { background: #93aeed; cursor: not-allowed; }
+
+    #new-chat-btn {
+      background: none;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      color: #475569;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    #new-chat-btn:hover { background: #f1f5f9; }
+
+    .empty-state {
+      margin: auto;
+      text-align: center;
+      color: #64748b;
+    }
+    .empty-state h2 { font-size: 1.3rem; margin-bottom: 8px; color: #334155; }
+    .empty-state p  { font-size: 0.88rem; line-height: 1.6; }
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 18px;
+    }
+    .suggestion {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      color: #334155;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .suggestion:hover { border-color: #1a56db; background: #eff6ff; color: #1a56db; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GMSH Command Helper</h1>
+    <span>Powered by GPT-4o · GMSH User Guide (458 pages)</span>
+  </div>
+  <button id="new-chat-btn" style="margin-left:auto" onclick="newChat()">+ New chat</button>
+</header>
+
+<div id="chat-container">
+  <div class="empty-state" id="empty-state">
+    <h2>Ask anything about GMSH</h2>
+    <p>Search commands, options, and examples from the official user guide.</p>
+    <div class="suggestions">
+      <div class="suggestion" onclick="useSuggestion(this)">How do I set mesh element size?</div>
+      <div class="suggestion" onclick="useSuggestion(this)">Transfinite mesh on a surface</div>
+      <div class="suggestion" onclick="useSuggestion(this)">How to define a periodic boundary?</div>
+      <div class="suggestion" onclick="useSuggestion(this)">Extrude a 2D surface to 3D</div>
+      <div class="suggestion" onclick="useSuggestion(this)">Save mesh in Abaqus format</div>
+      <div class="suggestion" onclick="useSuggestion(this)">MeshAdapt algorithm options</div>
+    </div>
+  </div>
+</div>
+
+<div id="input-bar">
+  <textarea id="question" rows="1" placeholder="Ask about a GMSH command or concept…"></textarea>
+  <button id="send-btn" onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+  let threadId = null;
+
+  async function initThread() {
+    const res = await fetch("/new_thread", { method: "POST" });
+    const data = await res.json();
+    threadId = data.thread_id;
+  }
+
+  async function newChat() {
+    await initThread();
+    document.getElementById("chat-container").innerHTML =
+      document.getElementById("empty-state")?.outerHTML ||
+      `<div class="empty-state" id="empty-state">
+        <h2>Ask anything about GMSH</h2>
+        <p>Search commands, options, and examples from the official user guide.</p>
+        <div class="suggestions">
+          <div class="suggestion" onclick="useSuggestion(this)">How do I set mesh element size?</div>
+          <div class="suggestion" onclick="useSuggestion(this)">Transfinite mesh on a surface</div>
+          <div class="suggestion" onclick="useSuggestion(this)">How to define a periodic boundary?</div>
+          <div class="suggestion" onclick="useSuggestion(this)">Extrude a 2D surface to 3D</div>
+          <div class="suggestion" onclick="useSuggestion(this)">Save mesh in Abaqus format</div>
+          <div class="suggestion" onclick="useSuggestion(this)">MeshAdapt algorithm options</div>
+        </div>
+      </div>`;
+  }
+
+  function useSuggestion(el) {
+    document.getElementById("question").value = el.textContent;
+    sendMessage();
+  }
+
+  function appendMessage(role, text) {
+    const container = document.getElementById("chat-container");
+    const emptyState = document.getElementById("empty-state");
+    if (emptyState) emptyState.remove();
+
+    const msg = document.createElement("div");
+    msg.className = `message ${role}`;
+    msg.innerHTML = `
+      <div class="avatar">${role === "user" ? "You" : "AI"}</div>
+      <div class="bubble"></div>`;
+    container.appendChild(msg);
+    container.scrollTop = container.scrollHeight;
+    return msg.querySelector(".bubble");
+  }
+
+  function renderMarkdown(text) {
+    // Simple markdown: code blocks, inline code, bold
+    return text
+      .replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${escHtml(code.trim())}</code></pre>`)
+      .replace(/`([^`]+)`/g, (_, code) => `<code>${escHtml(code)}</code>`)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+
+  async function sendMessage() {
+    const textarea = document.getElementById("question");
+    const question = textarea.value.trim();
+    if (!question) return;
+
+    const sendBtn = document.getElementById("send-btn");
+    textarea.value = "";
+    textarea.style.height = "auto";
+    sendBtn.disabled = true;
+
+    appendMessage("user", question);
+
+    // Typing indicator
+    const botBubble = appendMessage("bot", "");
+    botBubble.innerHTML = `<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;
+
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ thread_id: threadId, question }),
+    });
+
+    let fullText = "";
+    botBubble.innerHTML = "";
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6);
+        if (payload === "[DONE]") break;
+        try {
+          const data = JSON.parse(payload);
+          if (data.text !== undefined) {
+            fullText += data.text;
+            // Strip OpenAI citation markers like 【4:1†gmsh.pdf】
+            const clean = fullText.replace(/【[^】]*】/g, "");
+            botBubble.innerHTML = renderMarkdown(escHtml(clean));
+          }
+          document.getElementById("chat-container").scrollTop = 9999;
+        } catch {}
+      }
+    }
+
+    sendBtn.disabled = false;
+    textarea.focus();
+  }
+
+  // Auto-resize textarea
+  document.getElementById("question").addEventListener("input", function () {
+    this.style.height = "auto";
+    this.style.height = Math.min(this.scrollHeight, 140) + "px";
+  });
+
+  // Send on Enter (Shift+Enter for newline)
+  document.getElementById("question").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // Init on load
+  initThread();
+</script>
+</body>
+</html>

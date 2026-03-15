@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip3 install:*)",
+      "Bash(python3 -c \"import app\" 2>&1 | head -10 && echo \"OK\")"
+    ]
+  }
+}
