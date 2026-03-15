@@ -57,16 +57,16 @@ def get_or_create_assistant(client: OpenAI) -> str:
 
     if vs_id and asst_id:
         try:
-            client.beta.vector_stores.retrieve(vs_id)
+            client.vector_stores.retrieve(vs_id)
             client.beta.assistants.retrieve(asst_id)
             return asst_id
         except Exception:
             pass
 
     print("Creating vector store and uploading GMSH user guide...")
-    vs = client.beta.vector_stores.create(name="GMSH User Guide")
+    vs = client.vector_stores.create(name="GMSH User Guide")
     with open(PDF_PATH, "rb") as f:
-        client.beta.vector_stores.file_batches.upload_and_poll(
+        client.vector_stores.file_batches.upload_and_poll(
             vector_store_id=vs.id,
             files=[(PDF_PATH.name, f)],
         )
